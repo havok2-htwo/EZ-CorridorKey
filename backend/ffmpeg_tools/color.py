@@ -139,7 +139,7 @@ def _safe_scale_value(value: str, mapping: dict, known: set, param_name: str) ->
     if mapped and mapped not in known:
         logger.warning(
             "Unknown %s value '%s' (mapped from '%s') — FFmpeg may reject this. "
-            "Add it to _SCALE_%s_MAP in ffmpeg_tools.py",
+            "Add it to _SCALE_%s_MAP in backend/ffmpeg_tools/color.py",
             param_name, mapped, value, param_name.upper(),
         )
     return mapped
@@ -173,6 +173,16 @@ def build_exr_vf(video_info: dict) -> str:
 
     if not cs:
         cs = _default_matrix(w, h, cp)
+    elif cs == "gbr":
+        # FFprobe can report the RGB/GBR color-space enum on YUV streams.
+        # FFmpeg's scale filter rejects that value as in_color_matrix, so
+        # treat it as unusable matrix metadata and fall back by source shape.
+        fallback_cs = _default_matrix(w, h, cp)
+        logger.warning(
+            "YUV pix_fmt=%s reported matrix=gbr; using %s for FFmpeg scale",
+            pix_fmt, fallback_cs,
+        )
+        cs = fallback_cs
     if not cp:
         cp = _default_primaries(w, h, cs)
     if not ct:
